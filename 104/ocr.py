@@ -59,7 +59,7 @@ def check_expiry(expiry_date):
 def main():
     cap = cv2.VideoCapture(0)
 
-    print("Press 's' to capture an image or 'q' to quit.")
+    print("Press 'q' to quit.")
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -69,17 +69,14 @@ def main():
         # Display the live camera feed
         cv2.imshow("Camera", frame)
 
+        # Capture and process the image every 5 seconds
         start_time = time.time()
         while time.time() - start_time < 5:
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 cap.release()
                 cv2.destroyAllWindows()
                 return
-            
 
-        # key = cv2.waitKey(1) & 0xFF
-        # if key == ord('s'):  # Press 's' to capture
-        
         # Save the captured frame
         image_path = "image.jpg"
         processed_frame = preprocess_image(frame)
@@ -90,12 +87,6 @@ def main():
         expiry_date = extract_expiry_date(image_path)
         if expiry_date:
             check_expiry(expiry_date)
-
-        # elif key == ord('q'):  # Press 'q' to quit
-        #     break
-
-    cap.release()
-    cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     main()
