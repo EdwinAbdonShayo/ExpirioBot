@@ -24,7 +24,7 @@ def extract_expiry_date(image_path):
     print("Extracted Text:", text)
     
     # Extract expiry date using regex
-    pattern = r'\b\d{2}/\d{2}/\d{4}\b'  # Adjust this regex for different formats
+    pattern = r'\b\d{2}[./]\d{2}[./]\d{4}\b' 
     match = re.search(pattern, text)
     if match:
         expiry_date = match.group(0)
@@ -37,13 +37,17 @@ def extract_expiry_date(image_path):
 # Function to check if the product is expired
 def check_expiry(expiry_date):
     try:
-        expiry_date_obj = datetime.strptime(expiry_date, "%d/%m/%Y")
+        formatedDate = expiry_date.replace('.', '/')
+        expiry_date_obj = datetime.strptime(formatedDate, "%d/%m/%Y")
         today = datetime.today()
 
         if expiry_date_obj < today:
             print("The product has expired!")
+            state = 'left'
         else:
             print("The product is valid.")
+            state = 'right'
+        print(state)
     except ValueError:
         print("Invalid date format. Please check the extracted date.")
 
