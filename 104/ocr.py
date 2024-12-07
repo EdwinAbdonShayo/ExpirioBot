@@ -1,10 +1,14 @@
+
+# ExpirioBot
+
 import cv2
 from PIL import Image
 import pytesseract
 import re
 from datetime import datetime
+import time
 
-# Set Tesseract executable path (Windows only; comment this line on Linux/macOS)
+# Set Tesseract executable path
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Function to preprocess the image
@@ -21,7 +25,7 @@ def extract_expiry_date(image_path):
     image = Image.open(image_path)
     # Perform OCR
     text = pytesseract.image_to_string(image)
-    print("Extracted Text:", text)
+    print("Extracted Text:\n", text)
     
     # Extract expiry date using regex
     pattern = r'\b\d{2}[./]\d{2}[./]\d{4}\b' 
@@ -65,21 +69,30 @@ def main():
         # Display the live camera feed
         cv2.imshow("Camera", frame)
 
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('s'):  # Press 's' to capture
-            # Save the captured frame
-            image_path = "image.jpg"
-            processed_frame = preprocess_image(frame)
-            cv2.imwrite(image_path, processed_frame)
-            print(f"Image saved as {image_path}")
+        start_time = time.time()
+        while time.time() - start_time < 5:
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                cap.release()
+                cv2.destroyAllWindows()
+                return
+            
 
-            # Extract expiry date and check validity
-            expiry_date = extract_expiry_date(image_path)
-            if expiry_date:
-                check_expiry(expiry_date)
+        # key = cv2.waitKey(1) & 0xFF
+        # if key == ord('s'):  # Press 's' to capture
+        
+        # Save the captured frame
+        image_path = "image.jpg"
+        processed_frame = preprocess_image(frame)
+        cv2.imwrite(image_path, processed_frame)
+        print(f"Image saved as {image_path}")
 
-        elif key == ord('q'):  # Press 'q' to quit
-            break
+        # Extract expiry date and check validity
+        expiry_date = extract_expiry_date(image_path)
+        if expiry_date:
+            check_expiry(expiry_date)
+
+        # elif key == ord('q'):  # Press 'q' to quit
+        #     break
 
     cap.release()
     cv2.destroyAllWindows()
