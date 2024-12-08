@@ -40,9 +40,12 @@ def check_expiry(expiry_date):
         today = datetime.today()
 
         if expiry_date_obj < today:
+            state = "left"
             print("The product has expired!")
         else:
             print("The product is valid.")
+            state = "right"
+        print(state)
     except ValueError:
         print("Invalid date format. Please check the extracted date.")
 
