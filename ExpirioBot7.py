@@ -40,11 +40,13 @@ p_left = [180, 60, 50, 50, 90]  # Left position
 p_top = [90, 80, 50, 50, 90]    # Top (transition) position
 p_rest = [90, 90, 0, 5, 90]     # Rest position
 
-# Cooldown parameters
-COOLDOWN_DURATION = 5  # seconds
-cooldown_lock = threading.Lock()
-last_action_time = None  # Timestamp of the last action
+# Remove cooldown parameters
+# COOLDOWN_DURATION = 5  # seconds
+# cooldown_lock = threading.Lock()
 last_processed_date = None  # Last processed expiry date
+
+# Initialize a lock for queue operations
+queue_lock = threading.Lock()
 
 def move_object(target, processing_event, producer_allowed_event):
     """
@@ -104,6 +106,7 @@ def extract_expiry_date(image_path):
     text = pytesseract.image_to_string(image)
     print("Extracted Text:\n", text)
     
+    # Updated pattern to handle different date formats if necessary
     pattern = r'\b\d{2}[./]\d{2}[./]\d{4}\b' 
     match = re.search(pattern, text)
     if match:
@@ -115,15 +118,17 @@ def extract_expiry_date(image_path):
         return None
 
 # Consumer thread: Processes frames from the queue
-def process_frames(frame_queue, processing_event, producer_allowed_event):
-    global last_action_time
+def process_frames(frame_queue_container, processing_event, producer_allowed_event):
     global last_processed_date
     while True:
         # Wait until processing is allowed
         processing_event.wait()
 
-        if not frame_queue.empty():
-            frame = frame_queue.get()
+        with queue_lock:
+            current_queue = frame_queue_container[0]
+
+        if not current_queue.empty():
+            frame = current_queue.get()
             image_path = "image.jpg"
             processed_frame = preprocess_image(frame)
             cv2.imwrite(image_path, processed_frame)
@@ -138,19 +143,9 @@ def process_frames(frame_queue, processing_event, producer_allowed_event):
                     
                     # Check if the date has changed since last processing
                     if last_processed_date is None or last_processed_date != expiry_date_obj:
-                        # Check cooldown
-                        with cooldown_lock:
-                            current_time = time.time()
-                            if last_action_time is not None:
-                                elapsed_time = current_time - last_action_time
-                                if elapsed_time < COOLDOWN_DURATION:
-                                    remaining = COOLDOWN_DURATION - elapsed_time
-                                    print(f"Cooldown active. {remaining:.1f} seconds remaining.")
-                                    continue  # Skip action due to cooldown
-                            
-                            # Update last_action_time
-                            last_action_time = current_time
-                        
+                        # Update the last_processed_date
+                        last_processed_date = expiry_date_obj
+
                         # Determine the arm movement based on the expiry status
                         if expiry_date_obj < today:
                             target = "left"
@@ -159,43 +154,58 @@ def process_frames(frame_queue, processing_event, producer_allowed_event):
                             target = "right"
                             print("The product is valid.")
                         
-                        # Update the last processed date
-                        last_processed_date = expiry_date_obj
-
-                        # Pause producer and consumer, empty the queue
+                        # Pause producer and consumer
                         producer_allowed_event.clear()
                         processing_event.clear()
 
-                        while not frame_queue.empty():
-                            try:
-                                discarded_frame = frame_queue.get_nowait()
-                                print("Discarded a frame from the queue.")
-                            except queue.Empty:
-                                break
+                        # Replace the frame queue with a new one
+                        with queue_lock:
+                            frame_queue_container[0] = queue.Queue(maxsize=10)
+                            print("Replaced the frame queue with a new one.")
 
                         # Call the arm movement function
                         move_object(target, processing_event, producer_allowed_event)
                     else:
-                        print("No new date detected. Skipping action.")
+                        print("No new date detected. Replacing the queue to continue processing.")
+
+                        # Pause producer and consumer
+                        producer_allowed_event.clear()
+                        processing_event.clear()
+
+                        # Replace the frame queue with a new one
+                        with queue_lock:
+                            frame_queue_container[0] = queue.Queue(maxsize=10)
+                            print("Replaced the frame queue with a new one.")
+
+                        # Resume producer and consumer
+                        producer_allowed_event.set()
+                        processing_event.set()
+
                 except ValueError:
                     print("Invalid date format. Please check the extracted date.")
 
 # Producer thread: Captures frames and adds to the queue
-def capture_frames(cap, frame_queue, producer_allowed_event):
+def capture_frames(cap, frame_queue_container, producer_allowed_event):
     while True:
         producer_allowed_event.wait()  # Wait until producer is allowed to add frames
         ret, frame = cap.read()
         if not ret:
             print("Failed to grab frame")
             break
-        if frame_queue.full():
-            try:
-                discarded_frame = frame_queue.get_nowait()
-                print("Discarded oldest frame to make space.")
-            except queue.Empty:
-                pass
-        frame_queue.put(frame)
-        print("Added a frame to the queue.")
+
+        with queue_lock:
+            current_queue = frame_queue_container[0]
+
+            if current_queue.full():
+                try:
+                    discarded_frame = current_queue.get_nowait()
+                    print("Discarded oldest frame to make space.")
+                except queue.Empty:
+                    pass
+
+            current_queue.put(frame)
+            print("Added a frame to the queue.")
+
         time.sleep(0.03)  # Slight delay to simulate real-time capture
 
 # Main function
@@ -205,7 +215,7 @@ def main():
         print("Cannot open camera")
         return
 
-    frame_queue = queue.Queue(maxsize=10)  # Shared queue for frames
+    frame_queue_container = [queue.Queue(maxsize=10)]  # Shared container for frame queue
     processing_event = threading.Event()    # Event to control processing
     processing_event.set()                   # Start with processing enabled
 
@@ -213,8 +223,8 @@ def main():
     producer_allowed_event.set()                 # Start with producer allowed
 
     # Start the producer and consumer threads
-    producer_thread = threading.Thread(target=capture_frames, args=(cap, frame_queue, producer_allowed_event))
-    consumer_thread = threading.Thread(target=process_frames, args=(frame_queue, processing_event, producer_allowed_event))
+    producer_thread = threading.Thread(target=capture_frames, args=(cap, frame_queue_container, producer_allowed_event))
+    consumer_thread = threading.Thread(target=process_frames, args=(frame_queue_container, processing_event, producer_allowed_event))
     producer_thread.daemon = True
     consumer_thread.daemon = True
     producer_thread.start()
