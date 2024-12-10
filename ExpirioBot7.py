@@ -179,7 +179,7 @@ def process_frames(frame_queue_container, processing_event, producer_allowed_eve
 
                         # Reset last_processed_date to None
                         last_processed_date = None
-                        print("Reset last_processed_date to None.")
+                        # print("Reset last_processed_date to None.")
 
                         # Resume producer and consumer
                         producer_allowed_event.set()
@@ -203,12 +203,12 @@ def capture_frames(cap, frame_queue_container, producer_allowed_event):
             if current_queue.full():
                 try:
                     discarded_frame = current_queue.get_nowait()
-                    print("Discarded oldest frame to make space.")
+                    # print("Discarded oldest frame to make space.")
                 except queue.Empty:
                     pass
 
             current_queue.put(frame)
-            print("Added a frame to the queue.")
+            # print("Added a frame to the queue.")
 
         time.sleep(0.03)  # Slight delay to simulate real-time capture
 
