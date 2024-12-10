@@ -40,13 +40,14 @@ p_left = [180, 60, 50, 50, 90]  # Left position
 p_top = [90, 80, 50, 50, 90]    # Top (transition) position
 p_rest = [90, 90, 0, 5, 90]     # Rest position
 
-# Remove cooldown parameters
-# COOLDOWN_DURATION = 5  # seconds
-# cooldown_lock = threading.Lock()
 last_processed_date = None  # Last processed expiry date
 
-# Initialize a lock for queue operations
+# Lock for queue operations
 queue_lock = threading.Lock()
+
+# Global variable to store the latest frame for display
+latest_frame = None
+latest_frame_lock = threading.Lock()
 
 def move_object(target, processing_event, producer_allowed_event):
     """
@@ -94,20 +95,18 @@ def move_object(target, processing_event, producer_allowed_event):
         producer_allowed_event.set()
         processing_event.set()
 
-# Function to preprocess the image
 def preprocess_image(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     _, binary = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY)
     return binary
 
-# Function to extract text and expiry date
 def extract_expiry_date(image_path):
     image = Image.open(image_path)
     text = pytesseract.image_to_string(image)
     print("Extracted Text:\n", text)
     
     # Updated pattern to handle different date formats if necessary
-    pattern = r'\b\d{2}[./]\d{2}[./]\d{4}\b' 
+    pattern = r'\b\d{2}[./]\d{2}[./]\d{4}\b'
     match = re.search(pattern, text)
     if match:
         expiry_date = match.group(0)
@@ -190,12 +189,18 @@ def process_frames(frame_queue_container, processing_event, producer_allowed_eve
 
 # Producer thread: Captures frames and adds to the queue
 def capture_frames(cap, frame_queue_container, producer_allowed_event):
+    global latest_frame
     while True:
-        producer_allowed_event.wait()  # Wait until producer is allowed to add frames
+        producer_allowed_event.wait()  # Wait until producer is allowed
         ret, frame = cap.read()
         if not ret:
             print("Failed to grab frame")
-            break
+            time.sleep(0.1)
+            continue
+
+        # Update latest_frame for display
+        with latest_frame_lock:
+            latest_frame = frame.copy()
 
         with queue_lock:
             current_queue = frame_queue_container[0]
@@ -212,7 +217,6 @@ def capture_frames(cap, frame_queue_container, producer_allowed_event):
 
         time.sleep(0.03)  # Slight delay to simulate real-time capture
 
-# Main function
 def main():
     cap = cv2.VideoCapture(0)
     if not cap.isOpened():
@@ -222,7 +226,6 @@ def main():
     frame_queue_container = [queue.Queue(maxsize=10)]  # Shared container for frame queue
     processing_event = threading.Event()    # Event to control processing
     processing_event.set()                   # Start with processing enabled
-
     producer_allowed_event = threading.Event()  # Event to control producer
     producer_allowed_event.set()                 # Start with producer allowed
 
@@ -234,12 +237,14 @@ def main():
     producer_thread.start()
     consumer_thread.start()
 
-    # Display the live camera feed
     print("Press 'q' to quit.")
     while True:
-        ret, frame = cap.read()
-        if ret:
-            cv2.imshow("Camera", frame)
+        # Display the latest frame captured by the producer
+        with latest_frame_lock:
+            display_frame = latest_frame.copy() if latest_frame is not None else None
+
+        if display_frame is not None:
+            cv2.imshow("Camera", display_frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -251,4 +256,15 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        del Arm  # Release DOFBOT object
+        del Arm
+
+"""
+
+What’s Changed?
+
+No More cap.read() in main(): The main loop no longer reads from the camera. Instead, it relies on latest_frame set by the producer thread.
+Thread-Safe Variable latest_frame: The producer updates latest_frame with each new frame. The main loop locks and copies it for display.
+Error "Failed to grab frame" Handling: If cap.read() fails temporarily, the producer thread prints the error and retries. It does not affect the main display or cause threading issues.
+This setup ensures a more stable operation on the Raspberry Pi, preventing the previously seen conflict where one part of the code fails to grab a frame while another continues to show the feed.
+
+"""
