@@ -6,12 +6,12 @@ from datetime import datetime
 import threading
 import queue
 import time
-# from Arm_Lib import Arm_Device
+from Arm_Lib import Arm_Device
 import customtkinter as ctk
 
 # Initialize DOFBOT
-# Arm = Arm_Device()
-# time.sleep(0.1)
+Arm = Arm_Device()
+time.sleep(0.1)
 
 # Arm movement functions
 def arm_clamp_block(enable):
@@ -46,6 +46,52 @@ last_processed_date = None
 queue_lock = threading.Lock()
 processing_event = threading.Event()
 producer_allowed_event = threading.Event()
+
+def move_object(target, processing_event, producer_allowed_event):
+    """
+    Move an object from the front to the specified target side.
+
+    Parameters:
+    target (str): 'left' or 'right' indicating the movement direction.
+    processing_event (threading.Event): Event to pause AI vision processing.
+    producer_allowed_event (threading.Event): Event to control frame production.
+    """
+    # Pause processing and producer
+    processing_event.clear()
+    producer_allowed_event.clear()
+
+    try:
+        if target not in ['left', 'right']:
+            print("Invalid target! Use 'left' or 'right'.")
+            return
+
+        # Move to front position to pick object
+        arm_clamp_block(0)  # Open clamp
+        arm_move(p_front, 1000)  # Move to front position
+        arm_clamp_block(1)  # Clamp object
+
+        # Transition to top position
+        arm_move(p_top, 1000)
+
+        # Move to target position
+        if target == 'left':
+            arm_move(p_left, 1000)
+        elif target == 'right':
+            arm_move(p_right, 1000)
+
+        # Release object
+        arm_clamp_block(0)
+
+        # Return to rest position
+        arm_move(p_top, 1000)
+        arm_move(p_rest, 1000)
+
+    except Exception as e:
+        print(f"Error during arm movement: {e}")
+    finally:
+        # Resume processing and producer
+        producer_allowed_event.set()
+        processing_event.set()
 
 # Preprocess image function
 def preprocess_image(frame):
