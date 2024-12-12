@@ -8,23 +8,23 @@ from datetime import datetime
 import threading
 import queue
 import time
-# from Arm_Lib import Arm_Device
+from Arm_Lib import Arm_Device
 import tkinter as tk
 from tkinter import Label
 from PIL import Image, ImageTk
 
 # Initialize DOFBOT
-# Arm = Arm_Device()
-# time.sleep(0.1)
+Arm = Arm_Device()
+time.sleep(0.1)
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Arm movement functions (unchanged)
 def arm_clamp_block(enable):
     if enable == 0:  # Release
-        Arm.Arm_serial_servo_write(6, 60, 400)
+        Arm.Arm_serial_servo_write(6, 10, 400)
     else:  # Clamp
-        Arm.Arm_serial_servo_write(6, 130, 400)
+        Arm.Arm_serial_servo_write(6, 100, 400)
     time.sleep(0.5)
 
 def arm_move(p, s_time=500):
@@ -41,9 +41,11 @@ def arm_move(p, s_time=500):
     time.sleep(s_time / 1000)
 
 # Positions (unchanged)
-p_front = [90, 60, 50, 50, 90]  # Front position
-p_right = [0, 60, 50, 50, 90]   # Right position
-p_left = [180, 60, 50, 50, 90]  # Left position
+p_front = [90, 75, 0, 30, 90]  # Front position
+p_right = [0, 75, 0, 30, 90]   # Right position
+p_right_top = [0, 75, 0, 60, 90] # Right Top Position
+p_left_top = [180, 75, 0, 60, 90] # Right Top Position
+p_left = [180, 75, 0, 30, 90]  # Left position
 p_top = [90, 80, 50, 50, 90]    # Top (transition) position
 p_rest = [90, 90, 0, 5, 90]     # Rest position
 
@@ -81,11 +83,14 @@ def move_object(target, processing_event, producer_allowed_event):
         # Move to target position
         if target == 'left':
             arm_move(p_left, 1000)
+            # Release object
+            arm_clamp_block(0)
+            arm_move(p_left_top, 500)
         elif target == 'right':
             arm_move(p_right, 1000)
-
-        # Release object
-        arm_clamp_block(0)
+            # Release object
+            arm_clamp_block(0)
+            arm_move(p_right_top, 500)
 
         # Return to rest position
         arm_move(p_top, 1000)
@@ -225,7 +230,7 @@ def main():
 
     # Tkinter GUI setup
     root = tk.Tk()
-    root.title("Camera Feed")
+    root.title("ExpirioBot Control Panel")
 
     # Label to display the camera feed
     video_label = Label(root)
@@ -299,5 +304,5 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        # del Arm  # Release DOFBOT object
+        del Arm  # Release DOFBOT object
         print("Program Ended")
