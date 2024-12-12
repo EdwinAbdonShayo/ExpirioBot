@@ -1,21 +1,20 @@
 import cv2
-# from PIL import Image
 import pytesseract
 import re
 from datetime import datetime
 import threading
 import queue
 import time
-# from Arm_Lib import Arm_Device
+from Arm_Lib import Arm_Device
 import tkinter as tk
 from tkinter import Label
 from PIL import Image, ImageTk
 
 # Initialize DOFBOT
-# Arm = Arm_Device()
-# time.sleep(0.1)
+Arm = Arm_Device()
+time.sleep(0.1)
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 
 # Arm movement functions
@@ -186,20 +185,22 @@ def main():
 
     root = tk.Tk()
     root.title("ExpirioBot Control Panel")
+    root.configure(bg="#2e2e2e")
 
-    video_label = Label(root)
+    video_label = Label(root, bg="#2e2e2e")
     video_label.pack()
 
     expired_count = tk.IntVar(value=0)
     valid_count = tk.IntVar(value=0)
 
-    expired_label = tk.Label(root, textvariable=expired_count, font=("Helvetica", 14), fg="red")
+    expired_label = tk.Label(root, textvariable=expired_count, font=("Comfortaa", 14), fg="red", bg="#2e2e2e")
     expired_label.pack()
-    tk.Label(root, text="Expired Products", font=("Helvetica", 14)).pack()
+    tk.Label(root, text="Expired Products", font=("Comfortaa", 12), bg="#2e2e2e", fg="white").pack()
 
-    valid_label = tk.Label(root, textvariable=valid_count, font=("Helvetica", 14), fg="green")
+    valid_label = tk.Label(root, textvariable=valid_count, font=("Comfortaa", 14), fg="green", bg="#2e2e2e")
     valid_label.pack()
-    tk.Label(root, text="Valid Products", font=("Helvetica", 14)).pack()
+    tk.Label(root, text="Valid Products", font=("Comfortaa", 12), bg="#2e2e2e", fg="white").pack()
+
 
     frame_queue_container = [queue.Queue(maxsize=10)]
     processing_event = threading.Event()
@@ -237,8 +238,15 @@ def main():
             video_label.configure(image=imgtk)
         root.after(10, update_frame)
 
-    tk.Button(root, text="Start", command=start_program).pack()
-    tk.Button(root, text="Stop", command=stop_program).pack()
+    # Buttons
+    button_frame = tk.Frame(root, bg="#2e2e2e")  # Frame to hold the buttons
+    button_frame.pack(pady=10)
+
+    start_button = tk.Button(button_frame, text="Start", command=start_program, bg="#4caf50", fg="white", font=("Comfortaa", 12))
+    start_button.grid(row=0, column=0, padx=10)
+
+    stop_button = tk.Button(button_frame, text="Stop", command=stop_program, bg="#f44336", fg="white", font=("Comfortaa", 12))
+    stop_button.grid(row=0, column=1, padx=10)
 
     update_frame()
     root.mainloop()
@@ -248,5 +256,5 @@ if __name__ == "__main__":
     try:
         main()
     finally:
-        # del Arm
+        del Arm
         print("Program Ended")
