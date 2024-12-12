@@ -16,7 +16,8 @@ from PIL import Image, ImageTk
 Arm = Arm_Device()
 time.sleep(0.1)  # Allow the arm to initialize properly
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+# Path to installed tesseract (to be used in windows)
+# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Arm movement functions
 def arm_clamp_block(enable):
