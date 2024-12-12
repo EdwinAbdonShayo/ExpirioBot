@@ -1,3 +1,5 @@
+
+
 import cv2
 # from PIL import Image
 import pytesseract
@@ -6,16 +8,16 @@ from datetime import datetime
 import threading
 import queue
 import time
-from Arm_Lib import Arm_Device
+# from Arm_Lib import Arm_Device
 import tkinter as tk
 from tkinter import Label
 from PIL import Image, ImageTk
 
 # Initialize DOFBOT
-Arm = Arm_Device()
-time.sleep(0.1)
+# Arm = Arm_Device()
+# time.sleep(0.1)
 
-# pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # Arm movement functions (unchanged)
 def arm_clamp_block(enable):
@@ -232,18 +234,29 @@ def main():
     # Frame queue and threading events
     frame_queue_container = [queue.Queue(maxsize=10)]  # Shared container for frame queue
     processing_event = threading.Event()    # Event to control processing
-    processing_event.set()                   # Start with processing enabled
-
     producer_allowed_event = threading.Event()  # Event to control producer
-    producer_allowed_event.set()                 # Start with producer allowed
 
-    # Start the producer and consumer threads
-    producer_thread = threading.Thread(target=capture_frames, args=(cap, frame_queue_container, producer_allowed_event))
-    consumer_thread = threading.Thread(target=process_frames, args=(frame_queue_container, processing_event, producer_allowed_event))
-    producer_thread.daemon = True
-    consumer_thread.daemon = True
-    producer_thread.start()
-    consumer_thread.start()
+    # Thread references
+    producer_thread = None
+    consumer_thread = None
+
+    def start_program():
+        nonlocal producer_thread, consumer_thread
+
+        # Set processing and producer events
+        processing_event.set()
+        producer_allowed_event.set()
+
+        # Restart threads
+        if producer_thread is None or not producer_thread.is_alive():
+            producer_thread = threading.Thread(target=capture_frames, args=(cap, frame_queue_container, producer_allowed_event))
+            producer_thread.daemon = True
+            producer_thread.start()
+
+        if consumer_thread is None or not consumer_thread.is_alive():
+            consumer_thread = threading.Thread(target=process_frames, args=(frame_queue_container, processing_event, producer_allowed_event))
+            consumer_thread.daemon = True
+            consumer_thread.start()
 
     def update_frame():
         ret, frame = cap.read()
@@ -260,13 +273,18 @@ def main():
     def stop_program():
         producer_allowed_event.clear()  # Stop producer
         processing_event.clear()        # Stop processing
-        cap.release()                   # Release camera
-        root.destroy()                  # Close the GUI
-        # cv2.destroyAllWindows()
 
-    # Stop button in the GUI
+    # Run/Restart button functionality
+    def restart_program():
+        stop_program()
+        start_program()
+
+    # Stop and Restart buttons in the GUI
     stop_button = tk.Button(root, text="Stop", command=stop_program)
     stop_button.pack()
+
+    run_button = tk.Button(root, text="Run/Restart", command=restart_program)
+    run_button.pack()
 
     # Start updating the frame in the GUI
     update_frame()
@@ -276,11 +294,10 @@ def main():
 
     # Cleanup after GUI is closed
     cap.release()
-    # cv2.destroyAllWindows()
 
 if __name__ == "__main__":
     try:
         main()
     finally:
-        del Arm  # Release DOFBOT object
+        # del Arm  # Release DOFBOT object
         print("Program Ended")
