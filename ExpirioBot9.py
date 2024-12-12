@@ -116,10 +116,12 @@ def extract_expiry_date(image_path):
         return None
 
 # Consumer thread: Processes frames
-def process_frames(frame_queue_container):
+def process_frames(frame_queue_container, processing_event, producer_allowed_event):
     global last_processed_date
     while True:
+        # Wait until processing is allowed
         processing_event.wait()
+
         with queue_lock:
             current_queue = frame_queue_container[0]
 
@@ -137,9 +139,12 @@ def process_frames(frame_queue_container):
                     expiry_date_obj = datetime.strptime(formatted_date, "%d/%m/%Y")
                     today = datetime.today()
                     
+                    # Check if the date has changed since last processing
                     if last_processed_date is None or last_processed_date != expiry_date_obj:
+                        # Update the last_processed_date
                         last_processed_date = expiry_date_obj
 
+                        # Determine the arm movement based on the expiry status
                         if expiry_date_obj < today:
                             target = "left"
                             print("The product has expired!")
@@ -147,12 +152,36 @@ def process_frames(frame_queue_container):
                             target = "right"
                             print("The product is valid.")
                         
+                        # Pause producer and consumer
                         producer_allowed_event.clear()
                         processing_event.clear()
 
+                        # Replace the frame queue with a new one
                         with queue_lock:
                             frame_queue_container[0] = queue.Queue(maxsize=10)
                             print("Replaced the frame queue with a new one.")
+
+                        # Call the arm movement function
+                        move_object(target, processing_event, producer_allowed_event)
+                    else:
+                        print("No new date detected. Replacing the queue to continue processing.")
+
+                        # Pause producer and consumer
+                        producer_allowed_event.clear()
+                        processing_event.clear()
+
+                        # Replace the frame queue with a new one
+                        with queue_lock:
+                            frame_queue_container[0] = queue.Queue(maxsize=10)
+                            print("Replaced the frame queue with a new one.")
+
+                        # Reset last_processed_date to None
+                        last_processed_date = None
+                        # print("Reset last_processed_date to None.")
+
+                        # Resume producer and consumer
+                        producer_allowed_event.set()
+                        processing_event.set()
 
                 except ValueError:
                     print("Invalid date format. Please check the extracted date.")
@@ -177,7 +206,7 @@ def capture_frames(cap, frame_queue_container):
 
             current_queue.put(frame)
 
-        time.sleep(0.03)
+        time.sleep(0.1)
 
 # GUI and main function
 class App(ctk.CTk):
@@ -195,10 +224,10 @@ class App(ctk.CTk):
         processing_event.clear()
         producer_allowed_event.clear()
 
-        self.start_button = ctk.CTkButton(self, text="Start", command=self.start_processing)
+        self.start_button = ctk.CTkButton(self, text="Start", fg_color="green", command=self.start_processing)
         self.start_button.pack(pady=10)
 
-        self.stop_button = ctk.CTkButton(self, text="Stop", command=self.stop_processing)
+        self.stop_button = ctk.CTkButton(self, text="Stop", fg_color="red", command=self.stop_processing)
         self.stop_button.pack(pady=10)
 
         self.video_label = ctk.CTkLabel(self)
@@ -213,6 +242,7 @@ class App(ctk.CTk):
     def stop_processing(self):
         processing_event.clear()
         producer_allowed_event.clear()
+        # del Arm
 
     def update_camera_feed(self):
         ret, frame = self.cap.read()

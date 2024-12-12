@@ -210,7 +210,7 @@ def capture_frames(cap, frame_queue_container, producer_allowed_event):
             current_queue.put(frame)
             # print("Added a frame to the queue.")
 
-        time.sleep(0.03)  # Slight delay to simulate real-time capture
+        time.sleep(0.1)  # Slight delay to simulate real-time capture
 
 # Main function
 def main():
