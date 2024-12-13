@@ -2,6 +2,8 @@
 
 # The ExpirioBot
 
+![Dofbot Pi](https://raw.githubusercontent.com/YahboomTechnology/dofbot-Pi/refs/heads/main/DOFBOT_Pi_Yahboom.jpg)
+
 ## Overview
 
 ExpirioBot is an automated robotic system designed to identify and sort products based on their expiry dates. The system utilizes computer vision to capture images of products, extract expiry dates using Optical Character Recognition (OCR), and control a robotic arm to move expired or valid products to designated locations.
@@ -142,10 +144,11 @@ ExpirioBot is an automated robotic system designed to identify and sort products
 - Lastly, **Nivede** & **Karel** for their contributions (minimal) to the project.
 
 ## The Team
-Collaborators: `For any inquiries or issues, please contact`
+
    - [*Sakina*](https://github.com/saki3110)
    - [*Ishan*](https://github.com/ishan23310)  
    - [*Hans*](https://github.com/gt663) 
    - [*Edwin*](https://edwinshayo.com)
 
+   *For any inquiries or issues, reach out to any of the above*
 ***
